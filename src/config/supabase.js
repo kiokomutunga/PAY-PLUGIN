@@ -1,28 +1,27 @@
-import {createClient} from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseurl = process.env.SUPABASE_URL
-const supabasesecretkey = process.env.SUPABASE_SECRET_KEY
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
-if (!supabaseurl) {
-    throw new error ( "couldnt fetch supabase url")
+if (!supabaseUrl) {
+    
+    throw new Error("SUPABASE_URL is missing from the .env file");
 }
 
-if (!supabasesecretkey) {
-    throw new Error (" couldn't fetch supa secret key")
-}
-const supabase = createclient (
+if (!supabaseSecretKey) {
 
-    supabasesecretkey,
-    supabaseurl,
+    throw new Error("SUPABASE_SECRET_KEY is missing from the .env file");
+}
+
+const supabase = createClient(
+    supabaseUrl,
+    supabaseSecretKey,
     {
-        auth : {
-
-        persistToken: false,
-        autoRefreshToken : false
-
-    }
-
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false
+        }
     }
 );
 
-export default supabase 
+export default supabase;
