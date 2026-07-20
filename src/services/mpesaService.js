@@ -1,6 +1,6 @@
 
 const consumerKey = process.env.MPESA_CONSUMER_KEY
-const consumerSecret = process.env.MPESA.CONSUMER_SECRET
+const consumerSecret = process.env.MPESA_CONSUMER_SECRET
 const mpesaBaseUrl = process.env.MPESA_BASE_URL
 
 if (!consumerKey) {

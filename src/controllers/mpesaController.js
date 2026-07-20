@@ -1,19 +1,19 @@
 import {getMpesaAccessToken } from "../services/mpesaService.js";
 
-export async function testmpesaConnection (response, request) {
+export async function testMpesaConnection (request, response) {
 
     try {
         const accessToken = await getMpesaAccessToken ();
         return response.status(200).json ({
-            sucess: true,
-            message: "mpesa connection sucesful",
+            success: true,
+            message: "mpesa connection succesful",
             tokenReceived: Boolean(accessToken),
         });
 
 
     }
     catch(error){
-        return response.status().json({
+        return response.status(500).json({
 
             success: false,
             message: "Mpesa connection failed",
