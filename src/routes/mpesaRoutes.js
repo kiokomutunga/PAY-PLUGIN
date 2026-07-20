@@ -1,6 +1,6 @@
 import express from "express";
 
-import { testmpesaConnection } from "../controllers/mpesaController";
+import { testmpesaConnection } from "../controllers/mpesaController.js";
 
 const router = express.Router();
 

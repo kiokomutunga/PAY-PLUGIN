@@ -1,4 +1,4 @@
-import {getMpesaAccessToken } from "../services/mpesaService";
+import {getMpesaAccessToken } from "../services/mpesaService.js";
 
 export async function testmpesaConnection (response, request) {
 

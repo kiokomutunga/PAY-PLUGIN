@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import supabase from "./config/supabase.js";
+import mpesaRoutes from "./routes/mpesaRoutes.js"
 
 const app = express();
 
@@ -58,6 +59,8 @@ app.get ("/", (response,request)=>{
             message: "Pay App"
         }
     )
-})
+});
+
+app.use("/api/mpesa", mpesaRoutes);
 
 export default app;
