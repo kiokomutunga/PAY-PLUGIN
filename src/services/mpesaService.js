@@ -15,7 +15,7 @@ if (!mpesaBaseUrl){
     throw new Error ("confirm mpesa base url")
 }
 
-export async function getMpesaAcessToken (){
+export async function getMpesaAccessToken (){
     const credentials = `${consumerKey}:${consumerSecret}`;
     const encodedCredentials = Buffer.from(credentials).toString("base64"); //Buffer.from() converts the text into data Node can encode.
 
