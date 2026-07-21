@@ -69,3 +69,57 @@ function generateMpesaPassword (timestamp){
     return encodedPassword;
 }
 
+function formatPhoneNumber(phoneNumber) {
+    const cleanedPhone = String(phoneNumber)
+        .replace(/\D/g, "");
+
+    if (
+        cleanedPhone.startsWith("254") &&
+        cleanedPhone.length === 12
+    ) {
+        return cleanedPhone;
+    }
+    if (
+        cleanedPhone.startsWith("0") &&
+        cleanedPhone.length === 10
+    ) {
+        return `254${cleanedPhone.slice(1)}`;
+    }
+    if (
+        cleanedPhone.startsWith("7") &&
+        cleanedPhone.length === 9
+    ) {
+        return `254${cleanedPhone}`;
+    }
+    if (
+        cleanedPhone.startsWith("1") &&
+        cleanedPhone.length === 9
+    ) {
+        return `254${cleanedPhone}`;
+    }
+    throw new Error("Invalid Kenyan phone number.");
+}
+
+export async function initiateStkPush({ phoneNumber, amount, accountReference, transactionDescription,}){
+
+ //destructure the object for easy of updates
+    if (!phoneNumber){
+        throw new Error ("Phone number is required")
+    }
+    if (!amount){
+        throw new Error ("Amount is required")
+    }
+    if (Number.isNaN(paymentAmount) || paymentAmount <= 0) {
+        throw new Error("Amount must be greater than zero.");
+    }
+
+    const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
+    const paymentAmount = Number(amount) //incase frontend sends string amount token
+
+    const timestamp = generateTimestamp();
+
+    const password = generateMpesaPassword(timestamp);
+
+    const accessToken = await getMpesaAccessToken();
+
+}
