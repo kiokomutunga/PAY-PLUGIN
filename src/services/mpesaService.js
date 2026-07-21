@@ -100,7 +100,26 @@ function formatPhoneNumber(phoneNumber) {
     throw new Error("Invalid Kenyan phone number.");
 }
 
-console.log(formatPhoneNumber("0712345678"));
-console.log(formatPhoneNumber("712345678"));
-console.log(formatPhoneNumber("+254712345678"));
-console.log(formatPhoneNumber("0112345678"));
+export async function initiateStkPush({ phoneNumber, amount, accountReference, transactionDescription,}){
+
+ //destructure the object for easy of updates
+    if (!phoneNumber){
+        throw new Error ("Phone number is required")
+    }
+    if (!amount){
+        throw new Error ("Amount is required")
+    }
+    if (Number.isNaN(paymentAmount) || paymentAmount <= 0) {
+        throw new Error("Amount must be greater than zero.");
+    }
+
+    const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
+    const paymentAmount = Number(amount) //incase frontend sends string amount token
+
+    const timestamp = generateTimestamp();
+
+    const password = generateMpesaPassword(timestamp);
+
+    const accessToken = await getMpesaAccessToken();
+
+}
