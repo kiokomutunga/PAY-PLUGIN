@@ -2,6 +2,8 @@
 const consumerKey = process.env.MPESA_CONSUMER_KEY
 const consumerSecret = process.env.MPESA_CONSUMER_SECRET
 const mpesaBaseUrl = process.env.MPESA_BASE_URL
+const mpesaShortcode = process.env.MPESA_SHORTCODE
+const mpesaPasskey = process.env.MPESA_PASSKEY
 
 if (!consumerKey) {
     throw new Error ("wrong consumer key")
@@ -58,10 +60,12 @@ function generateTimestamp(){
     const second = String(now.getSeconds()).padStart(2, "0");
 
     return `${year}${month}${day}${hour}${minute}${second}`;
-
-    console.log(generateTimestamp)
 }
 
-console.log("Consumer key loaded:", Boolean(consumerKey));
-console.log("Timestamp:", generateTimestamp());
+function generateMpesaPassword (timestamp){
+    const passwordString = `${mpesaShortcode}${mpesaPasskey}${timestamp}`;//required password format by daraja
+    const encodedPassword = Buffer.from(passwordString).toString("base64");
+
+    return encodedPassword;
+}
 
