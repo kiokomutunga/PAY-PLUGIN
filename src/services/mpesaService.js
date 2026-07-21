@@ -45,7 +45,23 @@ export async function getMpesaAccessToken (){
     if (!data.access_token) {
         throw new Error("Safaricom response did not contain an access token");
     }
-
     return data.access_token;
 }
+//generate timestamp
+function generateTimestamp(){
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1 ).padStart (2, "0");
+    const day = String (now.getDate()).padStart (2, "0");
+    const hour = String(now.getHours()).padStart(2, "0");
+    const minute = String(now.getMinutes()).padStart(2, "0");
+    const second = String(now.getSeconds()).padStart(2, "0");
+
+    return `${year}${month}${day}${hour}${minute}${second}`;
+
+    console.log(generateTimestamp)
+}
+
+console.log("Consumer key loaded:", Boolean(consumerKey));
+console.log("Timestamp:", generateTimestamp());
 
