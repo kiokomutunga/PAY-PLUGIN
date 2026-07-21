@@ -69,3 +69,38 @@ function generateMpesaPassword (timestamp){
     return encodedPassword;
 }
 
+function formatPhoneNumber(phoneNumber) {
+    const cleanedPhone = String(phoneNumber)
+        .replace(/\D/g, "");
+
+    if (
+        cleanedPhone.startsWith("254") &&
+        cleanedPhone.length === 12
+    ) {
+        return cleanedPhone;
+    }
+    if (
+        cleanedPhone.startsWith("0") &&
+        cleanedPhone.length === 10
+    ) {
+        return `254${cleanedPhone.slice(1)}`;
+    }
+    if (
+        cleanedPhone.startsWith("7") &&
+        cleanedPhone.length === 9
+    ) {
+        return `254${cleanedPhone}`;
+    }
+    if (
+        cleanedPhone.startsWith("1") &&
+        cleanedPhone.length === 9
+    ) {
+        return `254${cleanedPhone}`;
+    }
+    throw new Error("Invalid Kenyan phone number.");
+}
+
+console.log(formatPhoneNumber("0712345678"));
+console.log(formatPhoneNumber("712345678"));
+console.log(formatPhoneNumber("+254712345678"));
+console.log(formatPhoneNumber("0112345678"));
