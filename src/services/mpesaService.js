@@ -122,4 +122,19 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
 
     const accessToken = await getMpesaAccessToken();
 
+    const payload = {
+        BusinessShortCode: mpesaShortcode,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: "CustomerPayBillOnline",
+        Amount: amount,
+        PartyA: formattedPhoneNumber,
+        PartyB: mpesaShortcode,    
+        CallBackURL: mpesaCallbackUrl,
+        AccountReference: accountReference,
+        TransactionDesc: transactionDescription,
+
+    };
+
+
 }
