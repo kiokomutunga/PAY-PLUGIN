@@ -127,14 +127,38 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
         Password: password,
         Timestamp: timestamp,
         TransactionType: "CustomerPayBillOnline",
-        Amount: amount,
+        Amount: paymentAmount,
         PartyA: formattedPhoneNumber,
         PartyB: mpesaShortcode,    
+        PhoneNumber: formattedPhoneNumber,
         CallBackURL: mpesaCallbackUrl,
         AccountReference: accountReference,
         TransactionDesc: transactionDescription,
-
     };
 
+    const response = await fetch(
+        `${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+                    },
+
+                    body: JSON.stringify(payload),
+        }
+    );
+
+    const responseData = await response.json();
+
+    if (!response.ok){
+        throw new Error (
+            responseData.errorMessage ||
+            responseData.ResponseDescription ||
+            "STK Push request failed"
+        );
+    }
+
+    return responseData;
 
 }
