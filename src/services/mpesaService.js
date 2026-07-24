@@ -1,9 +1,11 @@
+import {supabase} from "../config/supabase.js";
 
 const consumerKey = process.env.MPESA_CONSUMER_KEY
 const consumerSecret = process.env.MPESA_CONSUMER_SECRET
 const mpesaBaseUrl = process.env.MPESA_BASE_URL
 const mpesaShortcode = process.env.MPESA_SHORTCODE
 const mpesaPasskey = process.env.MPESA_PASSKEY
+const mpesaCallbackUrl = process.env.MPESA_CALLBACK_URL;
 
 if (!consumerKey) {
     throw new Error ("wrong consumer key")
@@ -15,6 +17,9 @@ if (!consumerSecret){
 
 if (!mpesaBaseUrl){
     throw new Error ("confirm mpesa base url")
+}
+if (!mpesaCallbackUrl) {
+    throw new Error("MPESA_CALLBACK_URL is missing.");
 }
 
 export async function getMpesaAccessToken (){
@@ -106,16 +111,19 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
     if (!phoneNumber){
         throw new Error ("Phone number is required")
     }
-    if (!amount){
-        throw new Error ("Amount is required")
+    if (amount === undefined || amount === null || amount === "") {
+        throw new Error("Amount is required.");
     }
+    const paymentAmount = Number(amount) //incase frontend sends string amount token
+    const safeAccountReference = accountReference || "PAYMENT";
+
+    const safeTransactionDescription = transactionDescription || "Customer payment";
     if (Number.isNaN(paymentAmount) || paymentAmount <= 0) {
         throw new Error("Amount must be greater than zero.");
     }
 
     const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
-    const paymentAmount = Number(amount) //incase frontend sends string amount token
-
+   
     const timestamp = generateTimestamp();
 
     const password = generateMpesaPassword(timestamp);
@@ -132,8 +140,8 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
         PartyB: mpesaShortcode,    
         PhoneNumber: formattedPhoneNumber,
         CallBackURL: mpesaCallbackUrl,
-        AccountReference: accountReference,
-        TransactionDesc: transactionDescription,
+        AccountReference: safeAccountReference,
+        TransactionDesc: safeTransactionDescription,
     };
 
     const response = await fetch(
@@ -159,6 +167,34 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
         );
     }
 
-    return responseData;
+    const { data: transaction, error: databaseError } = await supabase
+    .from("mpesa_transactions")
+    .insert({
+        checkout_request_id: responseData.CheckoutRequestID,
+        merchant_request_id: responseData.MerchantRequestID,
+        phone_number: formattedPhoneNumber,
+        amount: paymentAmount,
+        transaction_status: "PENDING",
+        account_reference: accountReference,
+        transaction_description: transactionDescription,
+        customer_message: responseData.CustomerMessage,
+        callback_received: false,
+    })
+    .select()
+    .single();
+
+    if (databaseError) {
+    throw new Error(
+        `STK Push was accepted, but saving the transaction failed: ${databaseError.message}`
+    );
+    }
+
+    return {
+        mpesaResponse: responseData,
+        transaction,
+    };
+    
+
+   
 
 }
