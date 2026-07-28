@@ -1,4 +1,5 @@
-import {supabase} from "../config/supabase.js";
+import "dotenv/config";
+import supabase from "../config/supabase.js";
 
 const consumerKey = process.env.MPESA_CONSUMER_KEY
 const consumerSecret = process.env.MPESA_CONSUMER_SECRET
@@ -21,6 +22,18 @@ if (!mpesaBaseUrl){
 if (!mpesaCallbackUrl) {
     throw new Error("MPESA_CALLBACK_URL is missing.");
 }
+
+console.log({
+    consumerKeyLoaded: Boolean(consumerKey),
+    consumerSecretLoaded: Boolean(consumerSecret),
+    mpesaBaseUrl,
+});
+console.log({
+    consumerKeyLength: consumerKey?.length,
+    consumerSecretLength: consumerSecret?.length,
+    keyHasSpaces: consumerKey !== process.env.MPESA_CONSUMER_KEY,
+    secretHasSpaces: consumerSecret !== process.env.MPESA_CONSUMER_SECRET,
+});
 
 export async function getMpesaAccessToken (){
     const credentials = `${consumerKey}:${consumerSecret}`;
@@ -159,13 +172,16 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
 
     const responseData = await response.json();
 
-    if (!response.ok){
-        throw new Error (
-            responseData.errorMessage ||
-            responseData.ResponseDescription ||
-            "STK Push request failed"
-        );
-    }
+    if (!response.ok) {
+    console.error("Safaricom STK error response:", responseData);
+
+    throw new Error(
+        responseData.errorMessage ||
+        responseData.ResponseDescription ||
+        responseData.errorCode ||
+        "STK Push request failed"
+    );
+}
 
     const { data: transaction, error: databaseError } = await supabase
     .from("mpesa_transactions")
@@ -193,6 +209,9 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
         mpesaResponse: responseData,
         transaction,
     };
+
+    
+
     
 
    
