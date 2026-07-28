@@ -1,9 +1,10 @@
 import express from "express";
-
-import { testMpesaConnection } from "../controllers/mpesaController.js";
+import {
+    handleMpesaCallback,
+} from "../controllers/mpesaCallbackController.js";
 
 const router = express.Router();
 
-router.get("/test-connection", testMpesaConnection);
+router.post("/callback", handleMpesaCallback);
 
-export default router
+export default router;
