@@ -191,8 +191,8 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
         phone_number: formattedPhoneNumber,
         amount: paymentAmount,
         transaction_status: "PENDING",
-        account_reference: accountReference,
-        transaction_description: transactionDescription,
+        account_reference: safeAccountReference,
+        transaction_description: safeTransactionDescription,
         customer_message: responseData.CustomerMessage,
         callback_received: false,
     })
@@ -209,11 +209,4 @@ export async function initiateStkPush({ phoneNumber, amount, accountReference, t
         mpesaResponse: responseData,
         transaction,
     };
-
-    
-
-    
-
-   
-
 }
