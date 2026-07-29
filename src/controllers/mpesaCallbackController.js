@@ -26,7 +26,7 @@ export async function handleMpesaCallback (req,res){
 
         const callbackItems = CallbackMetadata?.Item || [];
 
-        const metadata = callbackItema.reduce((result, item) => {
+        const metadata = callbackItems.reduce((result, item) => {
             result[item.Name] = item.Value;
             return result;
 
@@ -84,12 +84,13 @@ export async function handleMpesaCallback (req,res){
             transaction,
         });
     } catch (error) {
-        console.error("Callback processing error:", error);
+    console.error("Callback processing error:", error);
 
-        return res.status(500).json({
-            success: false,
-            message: "Callback processing failed",
-        });
-    }
+    return res.status(500).json({
+        success: false,
+        message: "Callback processing failed",
+        error: error.message,
+    });
+}
 
 }
