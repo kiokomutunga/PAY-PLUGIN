@@ -1,0 +1,67 @@
+$kind: http-request
+name: http://localhost:5000/api/mpesa/callback
+description: ""
+url: http://localhost:5000/api/mpesa/callback
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"Body\": {\r
+
+    \    \"stkCallback\": {\r
+
+    \      \"MerchantRequestID\": \"b8a0-4b73-8c6c-70a18412423221109\",\r
+
+    \      \"CheckoutRequestID\": \"ws_CO_280720261547067796304943\",\r
+
+    \      \"ResultCode\": 0,\r
+
+    \      \"ResultDesc\": \"The service request is processed successfully.\",\r
+
+    \      \"CallbackMetadata\": {\r
+
+    \        \"Item\": [\r
+
+    \          {\r
+
+    \            \"Name\": \"Amount\",\r
+
+    \            \"Value\": 1\r
+
+    \          },\r
+
+    \          {\r
+
+    \            \"Name\": \"MpesaReceiptNumber\",\r
+
+    \            \"Value\": \"TEST123ABC\"\r
+
+    \          },\r
+
+    \          {\r
+
+    \            \"Name\": \"TransactionDate\",\r
+
+    \            \"Value\": 20260728154710\r
+
+    \          },\r
+
+    \          {\r
+
+    \            \"Name\": \"PhoneNumber\",\r
+
+    \            \"Value\": 254796304943\r
+
+    \          }\r
+
+    \        ]\r
+
+    \      }\r
+
+    \    }\r
+
+    \  }\r
+
+    }"
+order: 1785318359874
