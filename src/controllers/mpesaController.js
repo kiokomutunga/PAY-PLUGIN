@@ -1,7 +1,4 @@
-import {
-    getMpesaAccessToken,
-    initiateStkPush,
-} from "../services/mpesaService.js";
+import { getMpesaAccessToken, initiateStkPush,} from "../services/mpesaService.js";
 
 export async function testMpesaConnection(request, response) {
     try {
@@ -24,11 +21,7 @@ export async function testMpesaConnection(request, response) {
 export async function initiateMpesaPayment(request, response) {
     try {
         const {
-            phoneNumber,
-            amount,
-            accountReference,
-            transactionDescription,
-        } = request.body;
+            phoneNumber, amount, accountReference, transactionDescription, } = request.body;
 
         const result = await initiateStkPush({
             phoneNumber,
