@@ -1,0 +1,19 @@
+$kind: http-request
+name: http://localhost:5000/api/mpesa/stkpush
+description: ""
+url: http://localhost:5000/api/mpesa/stkpush
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"phoneNumber\": \"0713072422\",\r
+
+    \  \"amount\": 1,\r
+
+    \  \"accountReference\": \"ORDER-003\",\r
+
+    \  \"transactionDescription\": \"Payment for order 005\"\r
+
+    }"
+order: 401460697991611
