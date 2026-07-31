@@ -1,34 +1,41 @@
-import { getMpesaAccessToken, initiateStkPush,} from "../services/mpesaService.js";
+import { getMpesaAccessToken, initiateStkPush, } from "../services/mpesaService.js";
 
-export async function testMpesaConnection(request, response) {
+export async function testMpesaConnection(
+    request,
+    response
+) {
     try {
-        const accessToken = await getMpesaAccessToken();
+        const accessToken =
+            await getMpesaAccessToken();
 
         return response.status(200).json({
             success: true,
-            message: "M-Pesa connection successful",
-            tokenReceived: Boolean(accessToken),
+            message:
+                "M-Pesa connection successful",
+            tokenReceived:
+                Boolean(accessToken),
         });
     } catch (error) {
         return response.status(500).json({
             success: false,
-            message: "M-Pesa connection failed",
+            message:
+                "M-Pesa connection failed",
             error: error.message,
         });
     }
 }
 
-export async function initiateMpesaPayment(request, response) {
+export async function initiateMpesaPayment(
+    request,
+    response
+) {
     try {
-        const {
-            phoneNumber,
-            amount,
-            accountReference,
-            transactionDescription,
-        } = request.body;
+        const { phoneNumber, amount, accountReference, transactionDescription, } = request.body;
 
         const idempotencyKey =
-            request.get("Idempotency-Key");
+            request
+                .get("Idempotency-Key")
+                ?.trim();
 
         if (!idempotencyKey) {
             return response.status(400).json({
@@ -46,23 +53,72 @@ export async function initiateMpesaPayment(request, response) {
             });
         }
 
-        const result = await initiateStkPush({
-            phoneNumber,
-            amount,
-            accountReference,
-            transactionDescription,
-            idempotencyKey,
-        });
+        const result =
+            await initiateStkPush({ phoneNumber, amount, accountReference,transactionDescription, idempotencyKey,
+                
+             });
 
-        const statusCode = result.reused ? 200 : 201;
+        if (result.reused) {
+            const transaction =
+                result.transaction;
 
-        return response.status(statusCode).json({
+            const transactionStatus =
+                transaction.transaction_status;
+
+            const statusMessages = {
+                INITIATING:
+                    "This payment request is already being initiated. Please wait before trying again.",
+
+                PENDING:
+                    "A payment request has already been sent to your phone. Please complete it or wait for the result.",
+
+                SUCCESS:
+                    "This payment has already been completed successfully. No new payment request was sent.",
+
+                FAILED:
+                    "The previous payment attempt failed. Start a new payment using a new idempotency key.",
+
+                CANCELLED:
+                    "The previous payment was cancelled. Start a new payment using a new idempotency key.",
+
+                TIMEOUT:
+                    "The previous payment request expired. Start a new payment using a new idempotency key.",
+
+                INITIATION_FAILED:
+                    "The previous payment request could not be initiated. Start a new payment using a new idempotency key.",
+            };
+
+            return response.status(200).json({
+                success: true,
+                message:
+                    statusMessages[
+                        transactionStatus
+                    ] ||
+                    "This payment request already exists. No new STK Push was sent.",
+
+                reused: true,
+
+                transactionStatus,
+
+                transaction,
+            });
+        }
+        return response.status(201).json({
             success: true,
-            message: result.reused
-                ? "Existing payment request returned."
-                : "STK Push initiated successfully.",
-            reused: result.reused,
-            data: result,
+            message:
+                "STK Push initiated successfully. Please check your phone and complete the payment.",
+
+            reused: false,
+
+            transactionStatus:
+                result.transaction
+                    .transaction_status,
+
+            mpesaResponse:
+                result.mpesaResponse,
+
+            transaction:
+                result.transaction,
         });
     } catch (error) {
         console.error(
@@ -74,6 +130,7 @@ export async function initiateMpesaPayment(request, response) {
             .status(error.statusCode || 500)
             .json({
                 success: false,
+
                 message:
                     error.message ||
                     "Failed to initiate STK Push.",

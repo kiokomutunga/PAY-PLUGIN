@@ -2,13 +2,13 @@ import express from "express";
 import cors from "cors";
 import supabase from "./config/supabase.js";
 import mpesaRoutes from "./routes/mpesaRoutes.js"
-
+import {errorHandler} from "./middleware/errorhandler.js"
 
 const app = express();
 
 app.use(express.json());
 
-app.use(errorHandler)
+
 
 app.use(
     cors(
@@ -64,7 +64,9 @@ app.get ("/", (response,request)=>{
     )
 });
 
-app.use("/api/mpesa", mpesaRoutes);
 
+
+app.use("/api/mpesa", mpesaRoutes);
+app.use(errorHandler)
 
 export default app;
