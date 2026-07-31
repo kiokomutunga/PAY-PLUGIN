@@ -117,96 +117,291 @@ function formatPhoneNumber(phoneNumber) {
     }
     throw new Error("Invalid Kenyan phone number.");
 }
+export async function initiateStkPush({
+    phoneNumber,
+    amount,
+    accountReference,
+    transactionDescription,
+    idempotencyKey,
+}) {
+    // 1. Validate request values
 
-export async function initiateStkPush({ phoneNumber, amount, accountReference, transactionDescription,}){
-
- //destructure the object for easy of updates
-    if (!phoneNumber){
-        throw new Error ("Phone number is required")
-    }
-    if (amount === undefined || amount === null || amount === "") {
-        throw new Error("Amount is required.");
-    }
-    const paymentAmount = Number(amount) //incase frontend sends string amount token
-    const safeAccountReference = accountReference || "PAYMENT";
-
-    const safeTransactionDescription = transactionDescription || "Customer payment";
-    if (Number.isNaN(paymentAmount) || paymentAmount <= 0) {
-        throw new Error("Amount must be greater than zero.");
+    if (!phoneNumber) {
+        const error = new Error("Phone number is required.");
+        error.statusCode = 400;
+        throw error;
     }
 
-    const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
-   
-    const timestamp = generateTimestamp();
+    if (
+        amount === undefined ||
+        amount === null ||
+        amount === ""
+    ) {
+        const error = new Error("Amount is required.");
+        error.statusCode = 400;
+        throw error;
+    }
 
-    const password = generateMpesaPassword(timestamp);
+    if (!idempotencyKey) {
+        const error = new Error(
+            "Idempotency key is required."
+        );
+        error.statusCode = 400;
+        throw error;
+    }
 
-    const accessToken = await getMpesaAccessToken();
+    const paymentAmount = Number(amount);
 
-    const payload = {
-        BusinessShortCode: mpesaShortcode,
-        Password: password,
-        Timestamp: timestamp,
-        TransactionType: "CustomerPayBillOnline",
-        Amount: paymentAmount,
-        PartyA: formattedPhoneNumber,
-        PartyB: mpesaShortcode,    
-        PhoneNumber: formattedPhoneNumber,
-        CallBackURL: mpesaCallbackUrl,
-        AccountReference: safeAccountReference,
-        TransactionDesc: safeTransactionDescription,
-    };
+    if (
+        Number.isNaN(paymentAmount) ||
+        paymentAmount <= 0
+    ) {
+        const error = new Error(
+            "Amount must be greater than zero."
+        );
+        error.statusCode = 400;
+        throw error;
+    }
 
-    const response = await fetch(
-        `${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`,
-        {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-                    },
+    const safeAccountReference =
+        accountReference || "PAYMENT";
 
-                    body: JSON.stringify(payload),
+    const safeTransactionDescription =
+        transactionDescription || "Customer payment";
+
+    const formattedPhoneNumber =
+        formatPhoneNumber(phoneNumber);
+
+    // 2. Check whether this key already exists
+
+    const {
+        data: existingTransaction,
+        error: existingTransactionError,
+    } = await supabase
+        .from("mpesa_transactions")
+        .select("*")
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle();
+
+    if (existingTransactionError) {
+        throw new Error(
+            `Failed to check idempotency key: ${existingTransactionError.message}`
+        );
+    }
+
+    if (existingTransaction) {
+        const samePayment =
+            String(existingTransaction.phone_number) ===
+                formattedPhoneNumber &&
+            Number(existingTransaction.amount) ===
+                paymentAmount;
+
+        if (!samePayment) {
+            const error = new Error(
+                "This idempotency key was already used for a different payment."
+            );
+
+            error.statusCode = 409;
+            throw error;
         }
-    );
 
-    const responseData = await response.json();
-
-    if (!response.ok) {
-    console.error("Safaricom STK error response:", responseData);
-
-    throw new Error(
-        responseData.errorMessage ||
-        responseData.ResponseDescription ||
-        responseData.errorCode ||
-        "STK Push request failed"
-    );
-}
-
-    const { data: transaction, error: databaseError } = await supabase
-    .from("mpesa_transactions")
-    .insert({
-        checkout_request_id: responseData.CheckoutRequestID,
-        merchant_request_id: responseData.MerchantRequestID,
-        phone_number: formattedPhoneNumber,
-        amount: paymentAmount,
-        transaction_status: "PENDING",
-        account_reference: safeAccountReference,
-        transaction_description: safeTransactionDescription,
-        customer_message: responseData.CustomerMessage,
-        callback_received: false,
-    })
-    .select()
-    .single();
-
-    if (databaseError) {
-    throw new Error(
-        `STK Push was accepted, but saving the transaction failed: ${databaseError.message}`
-    );
+        return {
+            reused: true,
+            mpesaResponse: null,
+            transaction: existingTransaction,
+        };
     }
 
-    return {
-        mpesaResponse: responseData,
-        transaction,
-    };
+    // 3. Reserve the key before calling Safaricom
+
+    const {
+        data: reservedTransaction,
+        error: reservationError,
+    } = await supabase
+        .from("mpesa_transactions")
+        .insert({
+            idempotency_key: idempotencyKey,
+            phone_number: formattedPhoneNumber,
+            amount: paymentAmount,
+            transaction_status: "INITIATING",
+            account_reference:
+                safeAccountReference,
+            transaction_description:
+                safeTransactionDescription,
+            callback_received: false,
+        })
+        .select()
+        .single();
+
+    if (reservationError) {
+        if (reservationError.code === "23505") {
+            const {
+                data: concurrentTransaction,
+                error: concurrentReadError,
+            } = await supabase
+                .from("mpesa_transactions")
+                .select("*")
+                .eq(
+                    "idempotency_key",
+                    idempotencyKey
+                )
+                .single();
+
+            if (concurrentReadError) {
+                throw new Error(
+                    "A duplicate payment request was detected, but the existing transaction could not be retrieved."
+                );
+            }
+
+            const samePayment =
+                String(
+                    concurrentTransaction.phone_number
+                ) === formattedPhoneNumber &&
+                Number(
+                    concurrentTransaction.amount
+                ) === paymentAmount;
+
+            if (!samePayment) {
+                const error = new Error(
+                    "This idempotency key was already used for a different payment."
+                );
+
+                error.statusCode = 409;
+                throw error;
+            }
+
+            return {
+                reused: true,
+                mpesaResponse: null,
+                transaction:
+                    concurrentTransaction,
+            };
+        }
+
+        throw new Error(
+            `Failed to reserve payment request: ${reservationError.message}`
+        );
+    }
+
+    // 4. Call Safaricom
+
+    try {
+        const timestamp = generateTimestamp();
+
+        const password =
+            generateMpesaPassword(timestamp);
+
+        const accessToken =
+            await getMpesaAccessToken();
+
+        const payload = {
+            BusinessShortCode: mpesaShortcode,
+            Password: password,
+            Timestamp: timestamp,
+            TransactionType:
+                "CustomerPayBillOnline",
+            Amount: paymentAmount,
+            PartyA: formattedPhoneNumber,
+            PartyB: mpesaShortcode,
+            PhoneNumber:
+                formattedPhoneNumber,
+            CallBackURL:
+                mpesaCallbackUrl,
+            AccountReference:
+                safeAccountReference,
+            TransactionDesc:
+                safeTransactionDescription,
+        };
+
+        const response = await fetch(
+            `${mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization:
+                        `Bearer ${accessToken}`,
+                    "Content-Type":
+                        "application/json",
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        const responseData =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                responseData.errorMessage ||
+                responseData.ResponseDescription ||
+                responseData.errorCode ||
+                "STK Push request failed."
+            );
+        }
+
+        // 5. Update reserved transaction to PENDING
+
+        const {
+            data: transaction,
+            error: databaseError,
+        } = await supabase
+            .from("mpesa_transactions")
+            .update({
+                checkout_request_id:
+                    responseData.CheckoutRequestID,
+
+                merchant_request_id:
+                    responseData.MerchantRequestID,
+
+                transaction_status: "PENDING",
+
+                customer_message:
+                    responseData.CustomerMessage,
+
+                updated_at:
+                    new Date().toISOString(),
+            })
+            .eq("id", reservedTransaction.id)
+            .select()
+            .single();
+
+        if (databaseError) {
+            throw new Error(
+                `STK Push was accepted, but updating the transaction failed: ${databaseError.message}`
+            );
+        }
+
+        return {
+            reused: false,
+            mpesaResponse: responseData,
+            transaction,
+        };
+    } catch (error) {
+        // 6. Mark failed initiation
+
+        const {
+            error: failureUpdateError,
+        } = await supabase
+            .from("mpesa_transactions")
+            .update({
+                transaction_status:
+                    "INITIATION_FAILED",
+
+                result_description:
+                    error.message,
+
+                updated_at:
+                    new Date().toISOString(),
+            })
+            .eq("id", reservedTransaction.id);
+
+        if (failureUpdateError) {
+            console.error(
+                "Failed to mark transaction as INITIATION_FAILED:",
+                failureUpdateError
+            );
+        }
+
+        throw error;
+    }
 }
