@@ -1,8 +1,8 @@
 import express from "express";
 
-import {testMpesaConnection, initiateMpesaPayment,} from "../controllers/mpesaController.js";
+import {testMpesaConnection, initiateMpesaPayment, } from "../controllers/mpesaController.js";
 
-import {handleMpesaCallback, } from "../controllers/mpesaCallbackController.js";
+import { handleMpesaCallback,} from "../controllers/mpesaCallbackController.js";
 
 const router = express.Router();
 
