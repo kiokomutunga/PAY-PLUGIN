@@ -66,7 +66,8 @@ export async function handleMpesaCallback (req,res){
 
         const numericResultCode = Number(ResultCode);
 
-        let transaction_status;
+        let transactionStatus;
+
         if (numericResultCode === 0){
             transactionStatus = "SUCCESS";
         }
