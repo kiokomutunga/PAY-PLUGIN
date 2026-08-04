@@ -24,7 +24,39 @@ export async function handleMpesaCallback (req,res){
             });
         }
 
-        const callbackItems = CallbackMetadata?.Item || [];
+        const {data: existingTransaction, error: transactionLookupError,} = await supabase.from("mpesa_transactions").select("*").eq("checkout_request_id", CheckoutRequestID).maybeSingle();
+        //searching table for transaction
+        if (transactionLookupError){
+            console.error("Transaction lookup error: ", transactionLookupError);
+
+            return res.status(500).json({
+                success: false,
+                message: "failed to retrieve payment",
+                error: transactionLookupError.message
+            });
+        }
+
+        //handle supabase database error
+        if (!existingTransaction){
+            return res.status(404).json({
+                success: false,
+                message: "Np transaction matching this CheckoutId"
+            })
+        }
+
+        if (existingTransaction.callback_received === true && existingTransaction.result_code !== null){
+            return res.status(200).json({
+                success: true,
+                message: "callback already processed. No duplicate update performed",
+                duplicate: true,
+                transactionStatus: existingTransaction.transaction_status,
+                transaction: existingTransaction,
+            });
+             }
+
+
+        const callbackItems = Array.isArray( CallbackMetadata?.Item) ?CallbackMetadata.Item : [];
+        
 
         const metadata = callbackItems.reduce((result, item) => {
             result[item.Name] = item.Value;
@@ -32,13 +64,27 @@ export async function handleMpesaCallback (req,res){
 
         }, {});
 
-        const transactionStatus =
-            Number(ResultCode) === 0 ? "SUCCESS" : "FAILED";
+        const numericResultCode = Number(ResultCode);
+
+        let transactionStatus;
+
+        if (numericResultCode === 0){
+            transactionStatus = "SUCCESS";
+        }
+        else if (numericResultCode === 1032){
+            transactionStatus = "CANCELLED"
+        }
+        else if (numericResultCode === 1037){
+            transactionStatus = "TIMEOUT"
+        }
+        else{
+            transactionStatus = "FAILED"
+        }
 
         const updateData = {
             merchant_request_id: MerchantRequestID,
             transaction_status: transactionStatus,
-            result_code: ResultCode,
+            result_code: numericResultCode,
             result_description: ResultDesc,
             callback_received: true,
             updated_at: new Date().toISOString(),
