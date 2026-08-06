@@ -8,15 +8,24 @@ const app = express();
 
 app.use(express.json());
 
-
-
 app.use(
-    cors(
-        {
-            origin: process.env.Url,
-        }
-    )
-) //only allow requests from this frontend
+    cors({
+        origin: "http://localhost:3000",
+        methods: [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        ],
+        allowedHeaders: [
+            "Content-Type",
+            "Authorization",
+            "Idempotency-Key",
+        ],
+    })
+);
+
 
 app.get("/api/health", (req, res) => {
   return res.status(200).json({

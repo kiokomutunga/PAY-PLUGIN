@@ -1,12 +1,11 @@
 import './App.css';
+import MpesaPaymentForm from './components/MpesaPaymentForm';
 
 function App() {
   return (
-    <div>
-      <h1 className="bg-black text-white">
-        this is the basic structure
-      </h1>
-    </div>
+   <main>
+      <MpesaPaymentForm/>
+   </main>
   );
 }
 
