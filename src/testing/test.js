@@ -1,7 +1,6 @@
 import "dotenv/config";
 import { initiateStkPush } from "../services/mpesaService";
 
-
 async function testStkPush() {
     try {
         const result = await initiateStkPush({
