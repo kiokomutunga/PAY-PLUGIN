@@ -9,7 +9,7 @@ export async function initiateMpesaPayment ({
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "Idemptency-Key": idempotencyKey  
+            "Idempotency-Key": idempotencyKey  
          },
 
         body: JSON.stringify({ phoneNumber, amount, accountReference, transactionDescription,
