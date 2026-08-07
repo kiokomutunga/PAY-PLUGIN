@@ -1,9 +1,8 @@
+import supabase from "../config/supabase.js";
 import { getMpesaAccessToken, initiateStkPush, } from "../services/mpesaService.js";
 
 export async function testMpesaConnection(
-    request,
-    response
-) {
+    request, response ) {
     try {
         const accessToken =
             await getMpesaAccessToken();
@@ -136,4 +135,75 @@ export async function initiateMpesaPayment(
                     "Failed to initiate STK Push.",
             });
     }
+}
+
+export async function getmpesaTransactionstatus (request, response){
+     try {
+        const { checkoutRequestId } = request.params;
+
+        if (!checkoutRequestId) {
+            return response.status(400).json({
+                success: false,
+                message:
+                    "CheckoutRequestID is required.",
+            });
+        }
+
+        const { data: transaction, error: databaseError, } = await supabase .from("mpesa_transactions")
+            .select(`
+                checkout_request_id, merchant_request_id, account_reference, phone_number,
+                amount,
+                transaction_status,
+                mpesa_receipt_number,
+                result_code,
+                result_description,
+                callback_received,
+                created_at,
+                updated_at
+            `)
+            .eq(
+                "checkout_request_id",
+                checkoutRequestId
+            )
+            .maybeSingle();
+
+        if (databaseError) {
+            console.error(
+                "Transaction-status database error:",
+                databaseError
+            );
+
+            return response.status(500).json({
+                success: false,
+                message:
+                    "Failed to retrieve payment status.",
+            });
+        }
+
+        if (!transaction) {
+            return response.status(404).json({
+                success: false,
+                message:
+                    "Payment transaction was not found.",
+            });
+        }
+
+        return response.status(200).json({
+            success: true,
+            transaction,
+        });
+    } catch (error) {
+        console.error(
+            "Payment-status controller error:",
+            error
+        );
+
+        return response.status(500).json({
+            success: false,
+            message:
+                "Failed to retrieve payment status.",
+            error: error.message,
+        });
+    }
+
 }
