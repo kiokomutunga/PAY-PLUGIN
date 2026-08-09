@@ -207,3 +207,64 @@ export async function getmpesaTransactionstatus (request, response){
     }
 
 }
+
+export async function getAllMpesaTransactions(
+    request,
+    response
+) {
+    try {
+        const { data: transactions, error } =
+            await supabase
+                .from("mpesa_transactions")
+                .select(`
+                    id,
+                    checkout_request_id,
+                    merchant_request_id,
+                    account_reference,
+                    phone_number,
+                    amount,
+                    transaction_status,
+                    mpesa_receipt_number,
+                    result_code,
+                    result_description,
+                    callback_received,
+                    created_at,
+                    updated_at
+                `)
+                .order("created_at", {
+                    ascending: false,
+                });
+
+        if (error) {
+            console.error(
+                "Failed to fetch transactions:",
+                error
+            );
+
+            return response.status(500).json({
+                success: false,
+                message:
+                    "Failed to retrieve transactions.",
+            });
+        }
+
+        return response.status(200).json({
+            success: true,
+            count: transactions.length,
+            transactions,
+        });
+
+    } catch (error) {
+        console.error(
+            "Transaction retrieval error:",
+            error
+        );
+
+        return response.status(500).json({
+            success: false,
+            message:
+                "Failed to retrieve transactions.",
+            error: error.message,
+        });
+    }
+}

@@ -1,12 +1,34 @@
-import './App.css';
-import MpesaPaymentForm from './components/MpesaPaymentForm';
+import {
+    BrowserRouter,
+    Routes,
+    Route,
+} from "react-router-dom";
 
-function App() {
-  return (
-   <main>
-      <MpesaPaymentForm/>
-   </main>
-  );
+import Dashboard from "./pages/Dashboard";
+import MpesaPaymentForm from "./components/MpesaPaymentForm";
+import TransactionsPage from "./pages/TransactionsPage";
+
+export default function App() {
+    return (
+        <BrowserRouter>
+            <Routes>
+
+                <Route
+                    path="/"
+                    element={<Dashboard />}
+                />
+
+                <Route
+                    path="/payments"
+                    element={<MpesaPaymentForm />}
+                />
+
+                <Route
+                    path="/transactions"
+                    element={<TransactionsPage />}
+                />
+
+            </Routes>
+        </BrowserRouter>
+    );
 }
-
-export default App;
