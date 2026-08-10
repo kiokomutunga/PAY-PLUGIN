@@ -1,6 +1,6 @@
 import express from "express";
 
-import {testMpesaConnection, initiateMpesaPayment, getmpesaTransactionstatus, getAllMpesaTransactions,} from "../controllers/mpesaController.js";
+import {testMpesaConnection, initiateMpesaPayment, getmpesaTransactionstatus, getAllMpesaTransactions, reconcileMpesaPayment} from "../controllers/mpesaController.js";
 
 import { handleMpesaCallback,} from "../controllers/mpesaCallbackController.js";
 
@@ -9,6 +9,16 @@ router.get("/transactions", getAllMpesaTransactions );
 router.get("/test", testMpesaConnection);
 router.post("/stkpush", initiateMpesaPayment);
 router.post("/callback", handleMpesaCallback);
-router.get("/transactions/:checkoutRequestId", getmpesaTransactionstatus)
+
+router.post(
+    "/transactions/:checkoutRequestId/reconcile",
+    reconcileMpesaPayment
+);
+
+router.get(
+    "/transactions/:checkoutRequestId",
+    getmpesaTransactionstatus
+);
+
 
 export default router;

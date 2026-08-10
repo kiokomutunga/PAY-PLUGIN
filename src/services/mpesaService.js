@@ -542,3 +542,106 @@ export async function queryStkPushStatus( checkoutRequestId ) {
 
     return responseData;
 }
+
+export async function reconcileMpesaTransaction(
+    checkoutRequestId
+) {
+    const {
+        data: existingTransaction,
+        error: lookupError,
+    } = await supabase
+        .from("mpesa_transactions")
+        .select("*")
+        .eq("checkout_request_id", checkoutRequestId)
+        .maybeSingle();
+
+    if (lookupError) {
+        throw new Error(
+            `Failed to retrieve transaction: ${lookupError.message}`
+        );
+    }
+
+    if (!existingTransaction) {
+        const error = new Error(
+            "Transaction not found."
+        );
+
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const finalStatuses = [
+        "SUCCESS",
+        "FAILED",
+        "CANCELLED",
+        "TIMEOUT",
+    ];
+
+    if (
+        finalStatuses.includes(
+            existingTransaction.transaction_status
+        )
+    ) {
+        return {
+            reconciled: false,
+            source: "database",
+            transaction: existingTransaction,
+        };
+    }
+
+    const mpesaResult =
+        await queryStkPushStatus(
+            checkoutRequestId
+        );
+
+    const resultCode =
+        Number(mpesaResult.ResultCode);
+
+    let transactionStatus;
+
+    if (resultCode === 0) {
+        transactionStatus = "SUCCESS";
+    } else if (resultCode === 1032) {
+        transactionStatus = "CANCELLED";
+    } else if (resultCode === 1037) {
+        transactionStatus = "TIMEOUT";
+    } else {
+        transactionStatus = "FAILED";
+    }
+
+    const {
+        data: transaction,
+        error: updateError,
+    } = await supabase
+        .from("mpesa_transactions")
+        .update({
+            transaction_status:
+                transactionStatus,
+            result_code:
+                resultCode,
+            result_description:
+                mpesaResult.ResultDesc ||
+                mpesaResult.ResponseDescription,
+            updated_at:
+                new Date().toISOString(),
+        })
+        .eq(
+            "checkout_request_id",
+            checkoutRequestId
+        )
+        .select()
+        .single();
+
+    if (updateError) {
+        throw new Error(
+            `Failed to reconcile transaction: ${updateError.message}`
+        );
+    }
+
+    return {
+        reconciled: true,
+        source: "mpesa-query",
+        mpesaResult,
+        transaction,
+    };
+}

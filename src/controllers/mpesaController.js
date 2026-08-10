@@ -1,5 +1,6 @@
 import supabase from "../config/supabase.js";
-import { getMpesaAccessToken, initiateStkPush, } from "../services/mpesaService.js";
+import { getMpesaAccessToken, initiateStkPush,reconcileMpesaTransaction, } from "../services/mpesaService.js";
+
 
 export async function testMpesaConnection(
     request, response ) {
@@ -266,5 +267,47 @@ export async function getAllMpesaTransactions(
                 "Failed to retrieve transactions.",
             error: error.message,
         });
+    }
+}
+
+export async function reconcileMpesaPayment(
+    request,
+    response
+) {
+    try {
+        const {
+            checkoutRequestId,
+        } = request.params;
+
+        const result = await reconcileMpesaTransaction( checkoutRequestId );
+
+        return response
+            .status(200)
+            .json({
+                success: true,
+                message: result.reconciled 
+                        ? "Transaction reconciled successfully."
+                        : "Transaction already has a final status.",
+
+                reconciled: result.reconciled,
+
+                source: result.source,
+
+                transaction: result.transaction,
+            });
+
+    } catch (error) {
+        console.error( "M-Pesa reconciliation error:",
+            error
+        );
+
+        return response
+            .status(
+                error.statusCode || 500
+            )
+            .json({
+                success: false,
+                message: error.message || "Failed to reconcile payment.",
+            });
     }
 }
