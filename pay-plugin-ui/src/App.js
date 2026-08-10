@@ -6,7 +6,8 @@ import {
 
 import Dashboard from "./pages/Dashboard";
 import MpesaPaymentForm from "./components/MpesaPaymentForm";
-import TransactionsPage from "./pages/TransactionsPage";
+import TransactionsPage from "./pages/TransactioPage";
+
 
 export default function App() {
     return (
@@ -24,9 +25,11 @@ export default function App() {
                 />
 
                 <Route
-                    path="/transactions"
-                    element={<TransactionsPage />}
+                  path="/transactions"
+                  element={<TransactionsPage />}
                 />
+
+                
 
             </Routes>
         </BrowserRouter>

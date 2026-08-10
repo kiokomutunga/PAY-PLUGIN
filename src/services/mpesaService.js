@@ -266,11 +266,7 @@ export async function initiateStkPush({
         .single();
 
     if (reservationError) {
-        /*
-         * PostgreSQL code 23505 means another
-         * request reserved the same unique key.
-         */
-        if (
+                if (
             reservationError.code === "23505"
         ) {
             const {
@@ -292,17 +288,9 @@ export async function initiateStkPush({
             }
 
             const samePayment =
-                String(
-                    concurrentTransaction
-                        .phone_number
-                ) === formattedPhoneNumber &&
-                Number(
-                    concurrentTransaction.amount
-                ) === paymentAmount &&
-                String(
-                    concurrentTransaction
-                        .account_reference
-                ) === safeAccountReference;
+                String( concurrentTransaction.phone_number ) === formattedPhoneNumber &&
+                Number( concurrentTransaction.amount ) === paymentAmount &&
+                String( concurrentTransaction.account_reference ) === safeAccountReference;
 
             if (!samePayment) {
                 const error = new Error(
@@ -325,61 +313,38 @@ export async function initiateStkPush({
             `Failed to reserve payment request: ${reservationError.message}`
         );
     }
-
-    /*
-     * This variable tells the catch block whether
-     * Safaricom already accepted the STK request.
-     */
     let stkPushAccepted = false;
     let responseData = null;
 
     try {
-        /*
-         * 4. Generate credentials and send
-         * the STK Push request.
-         */
+        
+        const timestamp = generateTimestamp();
 
-        const timestamp =
-            generateTimestamp();
+        const password = generateMpesaPassword( timestamp );
 
-        const password =
-            generateMpesaPassword(
-                timestamp
-            );
+        const accessToken = await getMpesaAccessToken();
 
-        const accessToken =
-            await getMpesaAccessToken();
-
-        const payload = {
-            BusinessShortCode:
-                mpesaShortcode,
+        const payload = { BusinessShortCode: mpesaShortcode,
 
             Password: password,
 
             Timestamp: timestamp,
 
-            TransactionType:
-                "CustomerPayBillOnline",
+            TransactionType: "CustomerPayBillOnline",
 
             Amount: paymentAmount,
 
-            PartyA:
-                formattedPhoneNumber,
+            PartyA: formattedPhoneNumber,
 
-            PartyB:
-                mpesaShortcode,
+            PartyB: mpesaShortcode,
 
-            PhoneNumber:
-                formattedPhoneNumber,
+            PhoneNumber: formattedPhoneNumber,
 
-            CallBackURL:
-                mpesaCallbackUrl,
+            CallBackURL: mpesaCallbackUrl,
 
-            AccountReference:
-                safeAccountReference,
+            AccountReference: safeAccountReference,
 
-            TransactionDesc:
-                safeTransactionDescription,
+            TransactionDesc: safeTransactionDescription,
         };
 
         const mpesaResponse = await fetch(
@@ -417,18 +382,7 @@ export async function initiateStkPush({
 
             throw error;
         }
-
-        /*
-         * Safaricom has accepted the request.
-         * From this point onward, do not mark it
-         * as INITIATION_FAILED.
-         */
         stkPushAccepted = true;
-
-        /*
-         * 5. Update the reserved transaction.
-         */
-
         const {
             data: transaction,
             error: databaseError,
@@ -480,10 +434,7 @@ export async function initiateStkPush({
             transaction,
         };
     } catch (error) {
-        /*
-         * Only mark INITIATION_FAILED when
-         * Safaricom did not accept the request.
-         */
+        
         if (!stkPushAccepted) {
             const {
                 error: failureUpdateError,
@@ -532,4 +483,62 @@ export async function initiateStkPush({
 
         throw error;
     }
+}
+export async function queryStkPushStatus( checkoutRequestId ) {
+    if (!checkoutRequestId) {
+        const error = new Error(
+            "CheckoutRequestID is required."
+        );
+
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const timestamp =
+        generateTimestamp();
+
+    const password = generateMpesaPassword( timestamp );
+
+    const accessToken = await getMpesaAccessToken();
+
+    const payload = {  BusinessShortCode:mpesaShortcode,
+
+        Password:password,
+
+        Timestamp: timestamp,
+
+        CheckoutRequestID: checkoutRequestId,
+    };
+
+    const response = await fetch(  `${mpesaBaseUrl}/mpesa/stkpushquery/v1/query`,
+        {
+            method: "POST",
+
+            headers: {
+                Authorization:  `Bearer ${accessToken}`,
+
+                "Content-Type":"application/json",
+            },
+
+            body:  JSON.stringify(payload),
+        }
+    );
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+        console.error(
+            "STK Query error:",
+            responseData
+        );
+
+        throw new Error(
+            responseData.errorMessage ||
+            responseData.ResponseDescription ||
+            responseData.errorCode ||
+            "Failed to query STK Push status."
+        );
+    }
+
+    return responseData;
 }
