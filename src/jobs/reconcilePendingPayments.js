@@ -1,29 +1,49 @@
 import supabase from "../config/supabase.js";
+
 import { reconcileMpesaTransaction, } from "../services/mpesaService.js";
+
+const MAX_RECONCILIATION_ATTEMPTS = 5;
+
+function getNextRetryTime(attemptNumber) {
+    const retryDelays = [ 30, 60, 120, 300,  600, ];
+
+    const delaySeconds =  retryDelays[attemptNumber] || retryDelays[
+            retryDelays.length - 1
+        ];
+
+    return new Date(
+        Date.now() +
+        delaySeconds * 1000
+    ).toISOString();
+}
 
 export async function reconcilePendingPayments() {
     try {
-        const cutoffTime = new Date(
-                Date.now() - 30 * 1000
-            ).toISOString();
+        const now =
+            new Date().toISOString();
 
         const {
             data: pendingTransactions,
             error,
-        } = await supabase.from("mpesa_transactions")
+        } = await supabase
+            .from("mpesa_transactions")
             .select(`
                 id,
                 checkout_request_id,
                 transaction_status,
-                created_at
+                reconciliation_attempts,
+                next_reconciliation_at
             `)
             .eq(
                 "transaction_status",
                 "PENDING"
             )
             .lt(
-                "created_at",
-                cutoffTime
+                "reconciliation_attempts",
+                MAX_RECONCILIATION_ATTEMPTS
+            )
+            .or(
+                `next_reconciliation_at.is.null,next_reconciliation_at.lte.${now}`
             );
 
         if (error) {
@@ -45,29 +65,108 @@ export async function reconcilePendingPayments() {
                 continue;
             }
 
+            const currentAttempts =
+                transaction.reconciliation_attempts || 0;
+
+            const nextAttemptNumber =
+                currentAttempts + 1;
+
             try {
                 const result =
                     await reconcileMpesaTransaction(
                         transaction.checkout_request_id
                     );
 
+                const finalStatus =
+                    result.transaction
+                        ?.transaction_status;
+
+                const isFinal =
+                    [
+                        "SUCCESS",
+                        "FAILED",
+                        "CANCELLED",
+                        "TIMEOUT",
+                    ].includes(
+                        finalStatus
+                    );
+
+                await supabase
+                    .from(
+                        "mpesa_transactions"
+                    )
+                    .update({
+                        reconciliation_attempts:
+                            nextAttemptNumber,
+
+                        last_reconciliation_at:
+                            new Date().toISOString(),
+
+                        next_reconciliation_at:
+                            isFinal
+                                ? null
+                                : getNextRetryTime(
+                                      nextAttemptNumber
+                                  ),
+                    })
+                    .eq(
+                        "id",
+                        transaction.id
+                    );
+
                 console.log(
-                    "Reconciliation result:",
+                    "Automatic reconciliation:",
                     {
                         checkoutRequestId:
                             transaction.checkout_request_id,
-                        reconciled:
-                            result.reconciled,
+
+                        attempt:
+                            nextAttemptNumber,
+
                         status:
-                            result.transaction
-                                ?.transaction_status,
+                            finalStatus,
                     }
                 );
             } catch (error) {
+                const nextRetry =
+                    nextAttemptNumber >=
+                    MAX_RECONCILIATION_ATTEMPTS
+                        ? null
+                        : getNextRetryTime(
+                              nextAttemptNumber
+                          );
+
+                await supabase
+                    .from(
+                        "mpesa_transactions"
+                    )
+                    .update({
+                        reconciliation_attempts:
+                            nextAttemptNumber,
+
+                        last_reconciliation_at:
+                            new Date().toISOString(),
+
+                        next_reconciliation_at:
+                            nextRetry,
+                    })
+                    .eq(
+                        "id",
+                        transaction.id
+                    );
+
                 console.error(
                     "Automatic reconciliation failed:",
-                    transaction.checkout_request_id,
-                    error.message
+                    {
+                        checkoutRequestId:
+                            transaction.checkout_request_id,
+
+                        attempt:
+                            nextAttemptNumber,
+
+                        error:
+                            error.message,
+                    }
                 );
             }
         }
