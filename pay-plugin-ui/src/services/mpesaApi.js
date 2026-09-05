@@ -83,3 +83,22 @@ export async function getAllMpesaTransactions() {
 
     return data.transactions || [];
 }
+
+export async function getMpesaTransaction(
+    checkoutRequestId
+) {
+    const response = await fetch(
+        `${API_BASE_URL}/api/mpesa/transactions/${checkoutRequestId}`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ||
+            "Failed to retrieve transaction."
+        );
+    }
+
+    return data.transaction;
+}
