@@ -7,6 +7,7 @@ import {
 import Dashboard from "./pages/Dashboard";
 import MpesaPaymentForm from "./components/MpesaPaymentForm";
 import TransactionsPage from "./pages/TransactioPage";
+import TransactionDetailsPage from "./pages/TransactionDetailsPage";
 
 
 export default function App() {
@@ -28,6 +29,11 @@ export default function App() {
                   path="/transactions"
                   element={<TransactionsPage />}
                 />
+
+                <Route
+                    path="/transactions/:checkoutRequestId"
+                    element={<TransactionDetailsPage />}
+/>
 
                 
 
