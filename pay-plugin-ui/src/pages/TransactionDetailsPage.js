@@ -14,6 +14,14 @@ import {
     getMpesaTransaction,
 } from "../services/mpesaApi";
 
+const FINAL_STATUSES = [
+    "SUCCESS",
+    "FAILED",
+    "CANCELLED",
+    "TIMEOUT",
+    "INITIATION_FAILED",
+];
+
 function TransactionDetailsPage() {
     const { checkoutRequestId } = useParams();
 
@@ -27,25 +35,81 @@ function TransactionDetailsPage() {
         useState("");
 
     useEffect(() => {
-        async function loadTransaction() {
+        let interval = null;
+        let active = true;
+
+        async function loadTransaction(
+            initialLoad = false
+        ) {
             try {
-                setLoading(true);
-                setError("");
+                if (initialLoad) {
+                    setLoading(true);
+                }
 
                 const data =
                     await getMpesaTransaction(
                         checkoutRequestId
                     );
 
+                if (!active) {
+                    return;
+                }
+
                 setTransaction(data);
+                setError("");
+
+                const isFinal =
+                    FINAL_STATUSES.includes(
+                        data.transaction_status
+                    );
+
+                if (isFinal) {
+                    if (interval) {
+                        clearInterval(
+                            interval
+                        );
+
+                        interval = null;
+                    }
+
+                    return;
+                }
+
+                if (!interval) {
+                    interval = setInterval(
+                        () => {
+                            loadTransaction(
+                                false
+                            );
+                        },
+                        5000
+                    );
+                }
             } catch (error) {
-                setError(error.message);
+                if (active) {
+                    setError(
+                        error.message
+                    );
+                }
             } finally {
-                setLoading(false);
+                if (
+                    active &&
+                    initialLoad
+                ) {
+                    setLoading(false);
+                }
             }
         }
 
-        loadTransaction();
+        loadTransaction(true);
+
+        return () => {
+            active = false;
+
+            if (interval) {
+                clearInterval(interval);
+            }
+        };
     }, [checkoutRequestId]);
 
     if (loading) {
@@ -65,7 +129,7 @@ function TransactionDetailsPage() {
         );
     }
 
-    if (error) {
+    if (error && !transaction) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#f3f7f3] px-6">
                 <div className="w-full max-w-md rounded-xl border border-red-100 bg-white p-8 text-center">
@@ -87,9 +151,13 @@ function TransactionDetailsPage() {
                         to="/transactions"
                         className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[#008f45]"
                     >
-                        <ArrowLeft size={16} />
+                        <ArrowLeft
+                            size={16}
+                        />
+
                         Back to transactions
                     </Link>
+
                 </div>
             </div>
         );
@@ -139,8 +207,11 @@ function TransactionDetailsPage() {
                 <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
 
                     <div className="flex items-center gap-3">
+
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#00a651] text-white">
-                            <Smartphone size={20} />
+                            <Smartphone
+                                size={20}
+                            />
                         </div>
 
                         <div>
@@ -152,6 +223,7 @@ function TransactionDetailsPage() {
                                 Payment Console
                             </p>
                         </div>
+
                     </div>
 
                     <Link
@@ -160,6 +232,7 @@ function TransactionDetailsPage() {
                     >
                         New Payment
                     </Link>
+
                 </div>
             </header>
 
@@ -169,9 +242,18 @@ function TransactionDetailsPage() {
                     to="/transactions"
                     className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-[#00a651]"
                 >
-                    <ArrowLeft size={17} />
+                    <ArrowLeft
+                        size={17}
+                    />
+
                     Transactions
                 </Link>
+
+                {error && transaction && (
+                    <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                        Unable to refresh payment status. Showing the latest available transaction information.
+                    </div>
+                )}
 
                 <div className="overflow-hidden rounded-2xl border border-[#e0e9e1] bg-white">
 
@@ -193,13 +275,17 @@ function TransactionDetailsPage() {
                             <div
                                 className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${getStatusStyle()}`}
                             >
-                                <StatusIcon size={17} />
+                                <StatusIcon
+                                    size={17}
+                                />
+
                                 {status}
                             </div>
 
                         </div>
 
                         <div className="mt-8">
+
                             <p className="text-sm text-slate-500">
                                 Amount
                             </p>
@@ -207,16 +293,25 @@ function TransactionDetailsPage() {
                             <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
                                 KES{" "}
                                 {Number(
-                                    transaction.amount || 0
+                                    transaction.amount ||
+                                        0
                                 ).toLocaleString()}
                             </p>
+
                         </div>
 
                         {isPending && (
                             <div className="mt-6 border-l-2 border-amber-400 pl-4">
-                                <p className="text-sm font-medium text-slate-700">
-                                    Waiting for payment confirmation
-                                </p>
+
+                                <div className="flex items-center gap-2">
+
+                                    <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+
+                                    <p className="text-sm font-medium text-slate-700">
+                                        Waiting for payment confirmation
+                                    </p>
+
+                                </div>
 
                                 <p className="mt-1 text-sm text-slate-500">
                                     Reconciliation attempts:{" "}
@@ -224,6 +319,11 @@ function TransactionDetailsPage() {
                                         0}{" "}
                                     of 5
                                 </p>
+
+                                <p className="mt-1 text-xs text-slate-400">
+                                    Payment status updates automatically.
+                                </p>
+
                             </div>
                         )}
 
@@ -326,12 +426,10 @@ function TransactionDetailsPage() {
 
                             <Detail
                                 label="Attempts"
-                                value={
-                                    `${
-                                        transaction.reconciliation_attempts ??
-                                        0
-                                    } / 5`
-                                }
+                                value={`${
+                                    transaction.reconciliation_attempts ??
+                                    0
+                                } / 5`}
                             />
 
                             <Detail
@@ -359,6 +457,7 @@ function TransactionDetailsPage() {
                                 <div className="my-8 border-t border-slate-100" />
 
                                 <div>
+
                                     <p className="text-sm font-medium text-slate-500">
                                         Result Description
                                     </p>
@@ -368,6 +467,7 @@ function TransactionDetailsPage() {
                                             transaction.result_description
                                         }
                                     </p>
+
                                 </div>
                             </>
                         )}
@@ -377,7 +477,9 @@ function TransactionDetailsPage() {
 
                 <p className="mt-4 text-center text-xs text-slate-400">
                     Checkout Request ID:{" "}
-                    {transaction.checkout_request_id}
+                    {
+                        transaction.checkout_request_id
+                    }
                 </p>
 
             </div>
@@ -392,17 +494,21 @@ function Detail({
 }) {
     return (
         <div>
+
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                 {label}
             </p>
 
             <p
                 className={`mt-1.5 break-words text-sm font-medium text-slate-800 ${
-                    mono ? "font-mono" : ""
+                    mono
+                        ? "font-mono"
+                        : ""
                 }`}
             >
                 {value ?? "Not available"}
             </p>
+
         </div>
     );
 }
