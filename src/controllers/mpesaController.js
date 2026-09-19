@@ -214,10 +214,74 @@ export async function getAllMpesaTransactions(
     response
 ) {
     try {
-        const { data: transactions, error } =
-            await supabase
-                .from("mpesa_transactions")
-                .select(`
+        const {
+            page = "1",
+            limit = "20",
+            status,
+            search,
+            from,
+            to,
+        } = request.query;
+
+        const pageNumber = Number(page);
+        const limitNumber = Number(limit);
+
+        if (
+            !Number.isInteger(pageNumber) ||
+            pageNumber < 1
+        ) {
+            return response.status(400).json({
+                success: false,
+                message:
+                    "Page must be a positive integer.",
+            });
+        }
+
+        if (
+            !Number.isInteger(limitNumber) ||
+            limitNumber < 1 ||
+            limitNumber > 100
+        ) {
+            return response.status(400).json({
+                success: false,
+                message:
+                    "Limit must be between 1 and 100.",
+            });
+        }
+
+        const allowedStatuses = [
+            "INITIATING",
+            "PENDING",
+            "SUCCESS",
+            "FAILED",
+            "CANCELLED",
+            "TIMEOUT",
+            "INITIATION_FAILED",
+        ];
+
+        if (
+            status &&
+            status !== "ALL" &&
+            !allowedStatuses.includes(status)
+        ) {
+            return response.status(400).json({
+                success: false,
+                message:
+                    "Invalid transaction status.",
+            });
+        }
+
+        const start =
+            (pageNumber - 1) *
+            limitNumber;
+
+        const end =
+            start + limitNumber - 1;
+
+        let query = supabase
+            .from("mpesa_transactions")
+            .select(
+                `
                     id,
                     checkout_request_id,
                     merchant_request_id,
@@ -231,10 +295,108 @@ export async function getAllMpesaTransactions(
                     callback_received,
                     created_at,
                     updated_at
-                `)
-                .order("created_at", {
+                `,
+                {
+                    count: "exact",
+                }
+            );
+
+        // Status filter
+        if (
+            status &&
+            status !== "ALL"
+        ) {
+            query = query.eq(
+                "transaction_status",
+                status
+            );
+        }
+
+        // Search
+        if (
+            search &&
+            search.trim()
+        ) {
+            const safeSearch =
+                search.trim();
+
+            query = query.or(
+                `account_reference.ilike.%${safeSearch}%,phone_number.ilike.%${safeSearch}%,mpesa_receipt_number.ilike.%${safeSearch}%`
+            );
+        }
+
+        // Date from
+        if (from) {
+            const fromDate =
+                new Date(from);
+
+            if (
+                Number.isNaN(
+                    fromDate.getTime()
+                )
+            ) {
+                return response
+                    .status(400)
+                    .json({
+                        success: false,
+                        message:
+                            "Invalid from date.",
+                    });
+            }
+
+            query = query.gte(
+                "created_at",
+                fromDate.toISOString()
+            );
+        }
+
+        // Date to
+        if (to) {
+            const toDate =
+                new Date(to);
+
+            if (
+                Number.isNaN(
+                    toDate.getTime()
+                )
+            ) {
+                return response
+                    .status(400)
+                    .json({
+                        success: false,
+                        message:
+                            "Invalid to date.",
+                    });
+            }
+
+            /*
+             * Include the whole selected day.
+             */
+            toDate.setHours(
+                23,
+                59,
+                59,
+                999
+            );
+
+            query = query.lte(
+                "created_at",
+                toDate.toISOString()
+            );
+        }
+
+        const {
+            data: transactions,
+            error,
+            count,
+        } = await query
+            .order(
+                "created_at",
+                {
                     ascending: false,
-                });
+                }
+            )
+            .range(start, end);
 
         if (error) {
             console.error(
@@ -242,18 +404,52 @@ export async function getAllMpesaTransactions(
                 error
             );
 
-            return response.status(500).json({
-                success: false,
-                message:
-                    "Failed to retrieve transactions.",
-            });
+            return response
+                .status(500)
+                .json({
+                    success: false,
+                    message:
+                        "Failed to retrieve transactions.",
+                });
         }
 
-        return response.status(200).json({
-            success: true,
-            count: transactions.length,
-            transactions,
-        });
+        const total =
+            count || 0;
+
+        const totalPages =
+            Math.ceil(
+                total /
+                limitNumber
+            );
+
+        return response
+            .status(200)
+            .json({
+                success: true,
+
+                transactions:
+                    transactions || [],
+
+                pagination: {
+                    page:
+                        pageNumber,
+
+                    limit:
+                        limitNumber,
+
+                    total,
+
+                    totalPages,
+
+                    hasNextPage:
+                        pageNumber <
+                        totalPages,
+
+                    hasPreviousPage:
+                        pageNumber >
+                        1,
+                },
+            });
 
     } catch (error) {
         console.error(
@@ -261,12 +457,17 @@ export async function getAllMpesaTransactions(
             error
         );
 
-        return response.status(500).json({
-            success: false,
-            message:
-                "Failed to retrieve transactions.",
-            error: error.message,
-        });
+        return response
+            .status(500)
+            .json({
+                success: false,
+
+                message:
+                    "Failed to retrieve transactions.",
+
+                error:
+                    error.message,
+            });
     }
 }
 
